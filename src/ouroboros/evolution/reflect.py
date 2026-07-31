@@ -798,9 +798,19 @@ Guidelines:
         )
         legacy_patches = _derive_legacy_patches(llm_refined_acs, parent_acs)
         if legacy_patches is None:
-            # Shorter list → full-rewrite semantics: use the LLM list as-is with
-            # no settled indices and no patches (do not guess at deletions).
-            return llm_refined_acs, (), ()
+            # A list shorter than the parent's deletes the acceptance criteria it
+            # omits, bypassing the backstop that exists to protect them. The
+            # model cannot delete an AC by asking — ``op: "remove"`` is coerced
+            # to keep, per "Never delete an AC" in the system prompt — so letting
+            # it delete by omission is a hole, not a feature. Emptied entirely it
+            # is worse still: a seed with nothing left to verify makes the per-AC
+            # convergence gate vacuous and the run verdict trivially passing.
+            # ``ac_patches`` expresses every legitimate intent here, and keeps
+            # every parent AC while doing so.
+            raise TypeError(
+                "Expected refined_acs to cover every parent acceptance criterion; "
+                "use ac_patches to revise or add"
+            )
         return _apply_satisficing_backstop(parent_acs, legacy_patches, protected, settleable)
 
 

@@ -248,12 +248,27 @@ class TestLegacyFallbackDiff:
         assert ops == ["keep", "revise", "keep", "add"]
         assert set(settled) == {0, 2}  # kept + passed; index 1 revised
 
-    def test_shorter_list_full_rewrite_semantics(self) -> None:
-        data = {"refined_acs": ["only one"]}
-        refined, patches, settled = _compose(data)
-        assert refined == ("only one",)
-        assert patches == ()
-        assert settled == ()
+    def test_shorter_list_rejected_rather_than_deleting_protected_acs(self) -> None:
+        """A short legacy list used to bypass the backstop and delete by omission.
+
+        The model cannot delete an AC by asking — ``op: "remove"`` is coerced to
+        keep — so it must not be able to delete one by leaving it out of a
+        full-list rewrite either. ``ac_patches`` covers every legitimate intent.
+        """
+        with pytest.raises(TypeError, match="cover every parent acceptance criterion"):
+            _compose({"refined_acs": ["only one"]})
+
+    def test_empty_refined_acs_rejected_rather_than_wiping_parent(self) -> None:
+        """An empty legacy list must not delete every acceptance criterion.
+
+        The shorter-list branch bypasses the satisficing backstop, so an empty
+        list used to hand back a successor seed with zero ACs — which makes the
+        per-AC convergence gate vacuous and the run verdict trivially passing.
+        ``ac_patches: []`` expresses the same "no changes" intent and correctly
+        keeps every parent AC.
+        """
+        with pytest.raises(TypeError, match="cover every parent acceptance criterion"):
+            _compose({"refined_acs": []})
 
     def test_derive_legacy_patches_shorter_returns_none(self) -> None:
         assert _derive_legacy_patches(("a",), ("a", "b", "c")) is None
